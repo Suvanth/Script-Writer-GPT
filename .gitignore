@@ -1,0 +1,4 @@
+# Ignore the example.py file
+apikey.py
+__pycache__/
+*.pyc
