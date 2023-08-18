@@ -6,6 +6,7 @@ from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
 from langchain.memory import ConversationBufferMemory
+from langchain.utilities import WikipediaAPIWrapper # api calls to wikipedia
 
 os.environ['OPENAI_API_KEY'] = apikey
 
@@ -19,20 +20,20 @@ title_template = PromptTemplate(
 )
 
 script_template = PromptTemplate(
-    input_variables =['title'],
-    template = 'Write me a script based around this TITLE: {title}'
+    input_variables =['title', 'wikipedia_research'],
+    template = 'You are a Management Consultant at Accenture and your audience is at the C-level, give a brief presentation based around this TITLE: {title} while leveraging this wikipedia research: {wikipedia_research}. Adopt a friendly casual tone during the presentation'
 )
 
 # Memory
-memory = ConversationBufferMemory(input_key='topic', memory_key='chat_history')
+title_memory = ConversationBufferMemory(input_key='topic', memory_key='chat_history')
+script_memory = ConversationBufferMemory(input_key='title', memory_key='chat_history')
 
 # LLM code
 llm = OpenAI(temperature=0.9) # level of creativity
-title_chain = LLMChain(llm=llm, prompt=title_template, verbose=True, output_key='title', memory=memory)
-script_chain = LLMChain(llm=llm, prompt=script_template, verbose=True, output_key='script', memory=memory)
-
+title_chain = LLMChain(llm=llm, prompt=title_template, verbose=True, output_key='title', memory=title_memory)
+script_chain = LLMChain(llm=llm, prompt=script_template, verbose=True, output_key='script', memory=script_memory)
+wiki = WikipediaAPIWrapper()
 # verbose is for logging
-sequential_chain = SequentialChain(chains=[title_chain, script_chain], verbose=True, input_variables=['topic'], output_variables=['title', 'script']) # specifies the order in which to run our chain
 
 
 
@@ -41,12 +42,22 @@ sequential_chain = SequentialChain(chains=[title_chain, script_chain], verbose=T
 
 
 if prompt:
-    response = sequential_chain({'topic': prompt})
-    st.write(response['title']) # write back the text
-    st.write(response['script']) # write back the text
+    title = title_chain.run(prompt)
+    wiki_research = wiki.run(prompt)
+    script = script_chain.run(title= title, wikipedia_research=wiki_research)
+    st.write(title) # write back the text
+    st.write(script) # write back the text
 
-    with st.expander('Message History'):
-        st.info(memory.buffer)
+    with st.expander('Title History'):
+        st.info(title_memory.buffer)
+    
+    with st.expander('Script History'):
+        st.info(script_memory.buffer)
+
+    with st.expander('Wikipedia Research History'):
+        st.info(wiki_research)
+
+    
 
 
 
